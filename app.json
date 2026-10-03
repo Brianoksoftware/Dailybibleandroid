@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Daily Bible",
+    "slug": "DailyBible",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "description": "Daily Bible verse of the day, Scripture search, and bookmarks. Free to start; Pro unlocks unlimited search and a reading list.",
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "expo-font",
+      "expo-iap"
+    ],
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2F6F62"
+      },
+      "package": "com.brianoksoftware.DailyBible",
+      "versionCode": 1
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5d38b8c0-3939-4729-97f3-f37e46573737"
+      }
+    }
+  }
+}
