@@ -3,7 +3,6 @@ import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import HomeScreen from './src/screens/HomeScreen';
@@ -14,8 +13,12 @@ import ReadingListScreen from './src/screens/ReadingListScreen';
 import PaywallScreen from './src/screens/PaywallScreen';
 import AboutScreen from './src/screens/AboutScreen';
 import LegalScreen from './src/screens/LegalScreen';
+import { AdsProvider } from './src/ads/AdsContext';
+import { PRO_DISPLAY_NAME } from './src/branding';
 import { ProProvider } from './src/pro/ProContext';
+import AnimatedTabBar from './src/navigation/AnimatedTabBar';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import HomeHeaderActions from './src/theme/HomeHeaderActions';
 import HomeTitle from './src/theme/HomeTitle';
 
 const Tab = createBottomTabNavigator();
@@ -32,7 +35,10 @@ function useStackScreenOptions() {
     headerShadowVisible: false,
     headerTitleStyle: {
       color: colors.text,
+      fontSize: 18,
+      fontWeight: '700' as const,
     },
+    cardStyle: { backgroundColor: colors.background },
   };
 }
 
@@ -44,7 +50,10 @@ function HomeStack() {
       <Stack.Screen
         name="HomeMain"
         component={HomeScreen}
-        options={{ headerTitle: () => <HomeTitle /> }}
+        options={{
+          headerTitle: () => <HomeTitle />,
+          headerRight: () => <HomeHeaderActions />,
+        }}
       />
       <Stack.Screen
         name="VerseDetail"
@@ -113,36 +122,10 @@ function ReadingStack() {
 }
 
 function Tabs() {
-  const { colors } = useTheme();
-
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
-
-          if (route.name === 'Home') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Search') {
-            iconName = focused ? 'search' : 'search-outline';
-          } else if (route.name === 'Saved') {
-            iconName = focused ? 'bookmark' : 'bookmark-outline';
-          } else if (route.name === 'List') {
-            iconName = focused ? 'book' : 'book-outline';
-          } else {
-            iconName = 'home-outline';
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: colors.header,
-          borderTopColor: colors.border,
-        },
-        headerShown: false,
-      })}
+      tabBar={(props) => <AnimatedTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Search" component={SearchStack} />
@@ -154,6 +137,7 @@ function Tabs() {
 
 function ThemedNavigation() {
   const { colors, isDark } = useTheme();
+  const rootScreenOptions = useStackScreenOptions();
   const base = isDark ? DarkTheme : DefaultTheme;
   const navigationTheme = {
     ...base,
@@ -172,7 +156,7 @@ function ThemedNavigation() {
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <NavigationContainer theme={navigationTheme}>
-        <RootStack.Navigator>
+        <RootStack.Navigator screenOptions={rootScreenOptions}>
           <RootStack.Screen
             name="Tabs"
             component={Tabs}
@@ -181,45 +165,20 @@ function ThemedNavigation() {
           <RootStack.Screen
             name="Paywall"
             component={PaywallScreen}
-            options={{
-              presentation: 'modal',
-              title: 'Daily Bible Pro',
-              headerStyle: { backgroundColor: colors.header },
-              headerTintColor: colors.text,
-              headerShadowVisible: false,
-            }}
+            options={{ presentation: 'modal', title: PRO_DISPLAY_NAME }}
           />
-          <RootStack.Screen
-            name="About"
-            component={AboutScreen}
-            options={{
-              title: 'About',
-              headerStyle: { backgroundColor: colors.header },
-              headerTintColor: colors.text,
-              headerShadowVisible: false,
-            }}
-          />
+          <RootStack.Screen name="About" component={AboutScreen} options={{ title: 'About' }} />
           <RootStack.Screen
             name="Privacy"
             component={LegalScreen}
             initialParams={{ kind: 'privacy' }}
-            options={{
-              title: 'Privacy Policy',
-              headerStyle: { backgroundColor: colors.header },
-              headerTintColor: colors.text,
-              headerShadowVisible: false,
-            }}
+            options={{ title: 'Privacy Policy' }}
           />
           <RootStack.Screen
             name="Terms"
             component={LegalScreen}
             initialParams={{ kind: 'terms' }}
-            options={{
-              title: 'Terms of Use',
-              headerStyle: { backgroundColor: colors.header },
-              headerTintColor: colors.text,
-              headerShadowVisible: false,
-            }}
+            options={{ title: 'Terms of Use' }}
           />
         </RootStack.Navigator>
       </NavigationContainer>
@@ -232,7 +191,9 @@ export default function App() {
     <SafeAreaProvider>
       <ThemeProvider>
         <ProProvider>
-          <ThemedNavigation />
+          <AdsProvider>
+            <ThemedNavigation />
+          </AdsProvider>
         </ProProvider>
       </ThemeProvider>
     </SafeAreaProvider>

@@ -1,8 +1,8 @@
 /**
- * Google Play Store listing copy for Daily Bible.
+ * Google Play Store listing copy for Daily Bible Friend Offline.
  *
  * Paste these fields into Play Console → Grow → Store presence → Main store listing.
- * Keep this file as the source of truth for titles, descriptions, and review notes.
+ * Title is ≤30 characters and includes unique + searchable terms (bible, daily, offline).
  *
  * Before you publish:
  * 1. Host `docs/` and set SITE_URL below to that public HTTPS origin (no trailing slash).
@@ -13,37 +13,40 @@
 
 const SITE_URL = 'https://REPLACE_WITH_YOUR_HOSTED_DOCS';
 
-/** ≤30 characters — Play Store title */
-const title = 'Daily Bible';
+/** ≤30 characters — Play Store title (heavily indexed) */
+const title = 'Daily Bible Friend Offline';
 
 /** ≤80 characters — short description (indexed for search) */
 const shortDescription =
-  'Verse of the day, Scripture search & bookmarks. Free to start; Pro unlocks more.';
+  'Offline daily verse, KJV search & bookmarks. Free; Pro unlocks unlimited search.';
 
 const keywords = [
-  'verse',
-  'scripture',
+  'offline bible',
+  'bible friend',
+  'daily bible',
+  'verse of the day',
+  'offline scripture',
   'kjv',
   'devotional',
+  'christian',
   'faith',
   'gospel',
-  'christian',
   'prayer',
-  'inspire',
   'psalm',
   'jesus',
-  'god',
   'worship',
   'hope',
   'bible',
-  'daily bible',
-  'verse of the day',
+  'scripture',
+  'verse',
 ];
 
-const fullDescription = `Start each day with Scripture. Daily Bible gives you a verse of the day, easy search, and bookmarks—so God’s Word stays close.
+const fullDescription = `Daily Bible Friend Offline is your companion for Scripture—even when you have no signal.
+
+Start each day with a verse of the day, search the Bible (KJV), bookmark favorites, and keep growing in faith. Popular verses work offline from the app’s saved catalog; live search uses the internet when available.
 
 WHAT YOU GET
-• Verse of the day that stays the same all day
+• Verse of the day that stays the same all day (works offline)
 • Search by word, topic, book, testament, or reference (like John 3:16)
 • Bookmark verses to revisit anytime
 • Share a verse with friends and family
@@ -51,32 +54,33 @@ WHAT YOU GET
 
 FREE VS PRO
 Free: daily verse, browse suggestions, bookmarks, and 3 searches per day.
-Daily Bible Pro (one-time purchase): unlimited search and a reading list you can check off as you go.
+Bible Friend Pro (one-time purchase): unlimited search and a reading list you can check off as you go.
 
 TEXT & TRANSLATION
-Popular passages are available in the app. Live lookup uses the King James Version (KJV) through public Bible services. No account required. Your bookmarks stay on your device.
+Popular passages are bundled for offline reading. Live lookup uses the King James Version (KJV) through public Bible services. No account required. Your bookmarks stay on your device.
 
-Open Daily Bible, read today’s verse, and keep growing in faith.
+Open Daily Bible Friend Offline, read today’s verse, and keep God’s Word close—online or offline.
 
-Keywords people use: ${keywords.join(', ')}.`;
+Search phrases: ${keywords.join(', ')}.`;
 
-const releaseNotes = `Welcome to Daily Bible.
+const releaseNotes = `Welcome to Daily Bible Friend Offline.
 
-• Verse of the day on Home
+• Verse of the day on Home (works offline)
 • Search Scripture by word, topic, book, or reference
 • Bookmark and share verses
-• Optional Daily Bible Pro for unlimited search and a reading list
+• Optional Bible Friend Pro for unlimited search and a reading list
 
 Thank you for reading with us.`;
 
-const reviewNotes = `Daily Bible is a Bible verse app for Android. No login or account.
+const reviewNotes = `Daily Bible Friend Offline is a Bible verse app for Android. No login or account.
 
 FREE FEATURES TO TEST
-1. Home: verse of the day and more suggested verses
+1. Home: verse of the day and more suggested verses (offline catalog)
 2. Bookmark with the bookmark icon; view them under Saved
 3. Search: up to 3 free searches per day (word, topic, book, testament, or reference such as John 3:16)
-4. Open a verse for context, related verses, and Share
-5. Theme toggle on the Home header; About/Privacy/Terms via the info icon
+4. Turn on airplane mode: daily verse and bookmarks still work; live search shows an offline message
+5. Open a verse for context, related verses, and Share
+6. Theme toggle on the Home header; About/Privacy/Terms via the info icon
 
 PRO (In-App Product: dailybible_pro, one-time / managed product)
 • Unlock from the paywall, from Search after the free limit, or from the Reading list tab
@@ -85,7 +89,7 @@ PRO (In-App Product: dailybible_pro, one-time / managed product)
 • In Expo Go purchases are simulated; Play store builds use Google Play Billing
 
 DATA
-Bookmarks, search count, theme, and Pro status are stored on device only. Verse lookups may call bible-api.com and bolls.life for KJV text. No ads or analytics SDKs.
+Bookmarks, search count, theme, and Pro status are stored on device only. Verse lookups may call bible-api.com and bolls.life for KJV text. Free tier shows AdMob banner ads on Home/Search; Pro removes ads.
 
 SUPPORT
 ${SITE_URL}/
@@ -120,7 +124,7 @@ module.exports = {
   reviewNotes,
   iap: {
     productId: 'dailybible_pro',
-    displayName: 'Daily Bible Pro',
+    displayName: 'Bible Friend Pro',
     description: 'Unlimited search & reading list',
     price: '$3.99',
   },

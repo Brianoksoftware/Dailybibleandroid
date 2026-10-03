@@ -1,81 +1,142 @@
 import React from 'react';
-import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { APP_NAME } from '../branding';
 import { CONTACT_EMAIL, CONTACT_NAME } from '../legal/content';
 import { openRootScreen } from '../navigation/openRootScreen';
+import { usePro } from '../pro/ProContext';
+import IconBubble from '../components/IconBubble';
+import { FadeIn, PressableScale, ScaleIn } from '../theme/motion';
 import { useTheme } from '../theme/ThemeContext';
+import { radius, spacing, staggerDelay, typography } from '../theme/tokens';
+import { cardShadow } from '../theme/ui';
 
 export default function AboutScreen({ navigation }: { navigation: any }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const { isPro } = usePro();
   const version = Constants.expoConfig?.version || '1.0.0';
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>Daily Bible</Text>
-      <Text style={[styles.meta, { color: colors.textSecondary }]}>Version {version}</Text>
-      <Text style={[styles.body, { color: colors.textSecondary }]}>
-        A daily verse app for personal reading. Free users get the verse of the day, bookmarks, and
-        three searches a day. Pro unlocks unlimited search and a reading list.
-      </Text>
+  const rows: {
+    icon: keyof typeof Ionicons.glyphMap;
+    label: string;
+    onPress: () => void;
+  }[] = [
+    {
+      icon: 'shield-checkmark-outline',
+      label: 'Privacy Policy',
+      onPress: () => openRootScreen(navigation, 'Privacy'),
+    },
+    {
+      icon: 'document-text-outline',
+      label: 'Terms of Use',
+      onPress: () => openRootScreen(navigation, 'Terms'),
+    },
+    {
+      icon: 'mail-outline',
+      label: `${CONTACT_NAME} · ${CONTACT_EMAIL}`,
+      onPress: () => Linking.openURL(`mailto:${CONTACT_EMAIL}`),
+    },
+  ];
 
-      <TouchableOpacity
-        style={[styles.row, { backgroundColor: colors.card }]}
-        onPress={() => openRootScreen(navigation, 'Privacy')}
-      >
-        <Ionicons name="shield-outline" size={20} color={colors.accent} />
-        <Text style={[styles.rowText, { color: colors.text }]}>Privacy Policy</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.row, { backgroundColor: colors.card }]}
-        onPress={() => openRootScreen(navigation, 'Terms')}
-      >
-        <Ionicons name="document-text-outline" size={20} color={colors.accent} />
-        <Text style={[styles.rowText, { color: colors.text }]}>Terms of Use</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.row, { backgroundColor: colors.card }]}
-        onPress={() => Linking.openURL(`mailto:${CONTACT_EMAIL}`)}
-      >
-        <Ionicons name="mail-outline" size={20} color={colors.accent} />
-        <Text style={[styles.rowText, { color: colors.text }]}>
-          {CONTACT_NAME} · {CONTACT_EMAIL}
+  return (
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      <ScaleIn style={styles.center}>
+        <IconBubble name="book" size={72} />
+      </ScaleIn>
+
+      <FadeIn delay={80} style={styles.center}>
+        <Text style={[styles.title, { color: colors.text }]}>{APP_NAME}</Text>
+        <View style={[styles.versionPill, { backgroundColor: colors.chip }]}>
+          <Text style={[styles.versionText, { color: colors.textSecondary }]}>
+            Version {version}
+            {isPro ? ' · Pro' : ''}
+          </Text>
+        </View>
+        <Text style={[styles.body, { color: colors.textSecondary }]}>
+          A daily verse companion for personal reading — online or offline. Free users get the verse
+          of the day, bookmarks, and three searches a day. Pro unlocks unlimited search and a reading
+          list.
         </Text>
-      </TouchableOpacity>
-    </View>
+      </FadeIn>
+
+      {rows.map((row, index) => (
+        <FadeIn key={row.label} delay={staggerDelay(index, 60, 220)} fromY={10}>
+          <PressableScale
+            style={[styles.row, { backgroundColor: colors.card }, cardShadow(isDark)]}
+            onPress={row.onPress}
+            accessibilityRole="button"
+            accessibilityLabel={row.label}
+          >
+            <View style={[styles.rowIcon, { backgroundColor: colors.accentSoft }]}>
+              <Ionicons name={row.icon} size={18} color={colors.accent} />
+            </View>
+            <Text style={[styles.rowText, { color: colors.text }]} numberOfLines={1}>
+              {row.label}
+            </Text>
+            <Ionicons name="chevron-forward" size={17} color={colors.textMuted} />
+          </PressableScale>
+        </FadeIn>
+      ))}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+  },
+  content: {
+    padding: spacing.xl,
+    paddingBottom: 40,
+  },
+  center: {
+    alignItems: 'center',
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 6,
+    ...typography.title,
+    textAlign: 'center',
+    marginTop: spacing.lg,
   },
-  meta: {
-    fontSize: 15,
-    marginBottom: 16,
+  versionPill: {
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+  },
+  versionText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   body: {
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 24,
+    ...typography.body,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+    marginBottom: spacing.xl,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  rowIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
   },
   rowText: {
     flex: 1,
-    marginLeft: 10,
-    fontSize: 16,
+    fontSize: 14.5,
     fontWeight: '600',
+    marginRight: spacing.sm,
   },
 });

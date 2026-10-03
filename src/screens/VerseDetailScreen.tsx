@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  Animated,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
   Share,
 } from 'react-native';
@@ -17,8 +16,14 @@ import { isFavorite as loadIsFavorite, toggleFavorite as persistFavorite } from 
 import { addVerseToReadingList } from '../storage/readingList';
 import { usePro } from '../pro/ProContext';
 import { openPaywall } from '../navigation/openPaywall';
+import EmptyState from '../components/EmptyState';
+import VerseSkeleton from '../components/VerseSkeleton';
+import { FadeIn, PopOnChange, PressableScale, ScaleIn } from '../theme/motion';
 import { useTheme } from '../theme/ThemeContext';
+import { radius, spacing, staggerDelay, typography } from '../theme/tokens';
+import { cardShadow, heroShadow } from '../theme/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { isOnline } from '../utils/network';
 
 interface VerseDetailScreenProps {
   navigation: any;
@@ -28,11 +33,13 @@ interface VerseDetailScreenProps {
 export default function VerseDetailScreen({ navigation, route }: VerseDetailScreenProps) {
   const { verseId } = route.params;
   const { isPro } = usePro();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [verse, setVerse] = useState<Verse | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [onList, setOnList] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadVerseDetails();
@@ -46,7 +53,13 @@ export default function VerseDetailScreen({ navigation, route }: VerseDetailScre
       setIsFavorite(await loadIsFavorite(verseId));
     } catch (error) {
       console.error('Failed to load verse details:', error);
-      Alert.alert('Error', 'Failed to load this verse. Please try again.');
+      const online = await isOnline();
+      Alert.alert(
+        online ? 'Could not load verse' : 'No internet connection',
+        online
+          ? 'Failed to load this verse. Please try again.'
+          : 'This verse needs an internet connection to load. Check your network and try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -65,6 +78,7 @@ export default function VerseDetailScreen({ navigation, route }: VerseDetailScre
       return;
     }
     const added = await addVerseToReadingList(verse);
+    setOnList(true);
     Alert.alert(
       added ? 'Added to reading list' : 'Already on your list',
       added ? `${verse.reference} was saved to your reading list.` : 'This verse is already on your reading list.'
@@ -86,274 +100,396 @@ export default function VerseDetailScreen({ navigation, route }: VerseDetailScre
 
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading verse...</Text>
+      <View style={[styles.stateContainer, { backgroundColor: colors.background, paddingTop: insets.top + spacing.xl }]}>
+        <VerseSkeleton tall count={2} />
       </View>
     );
   }
 
   if (!verse) {
     return (
-      <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
-        <Ionicons name="alert-circle" size={64} color={colors.accent} />
-        <Text style={[styles.errorText, { color: colors.text }]}>Verse not found</Text>
-        <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.accent }]} onPress={loadVerseDetails}>
-          <Text style={styles.retryButtonText}>Try Again</Text>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={[styles.plainBack, { backgroundColor: colors.chip }]}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="arrow-back" size={20} color={colors.text} />
         </TouchableOpacity>
+        <EmptyState
+          icon="cloud-offline-outline"
+          title="Verse unavailable"
+          message="This passage may need an internet connection. Check your network and try again."
+          actionLabel="Try again"
+          onAction={loadVerseDetails}
+        />
       </View>
     );
   }
 
   const related = VerseService.getRelatedVerses(verse);
 
+  const heroScale = scrollY.interpolate({
+    inputRange: [-120, 0],
+    outputRange: [1.18, 1],
+    extrapolateRight: 'clamp',
+  });
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
-      <LinearGradient colors={colors.gradient} style={[styles.hero, { paddingTop: insets.top + 16 }]}>
-        <View style={styles.heroActions}>
-          <TouchableOpacity style={[styles.actionButton, { marginLeft: 0 }]} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </TouchableOpacity>
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.actionButton} onPress={toggleFavorite}>
-              <Ionicons
-                name={isFavorite ? 'bookmark' : 'bookmark-outline'}
-                size={24}
-                color="white"
-              />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={shareVerse}>
-              <Ionicons name="share-outline" size={24} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
-        <Text style={styles.heroReference}>{verse.reference}</Text>
-        <Text style={styles.heroTranslation}>{verse.translation} · {verse.testament} Testament</Text>
-      </LinearGradient>
-
-      <View style={styles.content}>
-        <Text style={[styles.verseText, { color: colors.text }]}>{verse.text}</Text>
-
-        {verse.topics.length > 0 && (
-          <View style={styles.tagsContainer}>
-            {verse.topics.map((topic) => (
-              <View key={topic} style={[styles.tag, { backgroundColor: colors.accent }]}>
-                <Text style={styles.tagText}>{topic}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        <TouchableOpacity style={[styles.readingButton, { backgroundColor: colors.accent }]} onPress={addToReadingList}>
-          <Ionicons name="book-outline" size={18} color="white" />
-          <Text style={styles.readingButtonText}>
-            {isPro ? 'Add to reading list' : 'Unlock reading list'}
-          </Text>
-        </TouchableOpacity>
-
-        {verse.context.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>In context</Text>
-            {verse.context.map((line) => (
-              <View key={line.verse} style={styles.contextRow}>
-                <Text style={[styles.contextNumber, { color: colors.accent }]}>{line.verse}</Text>
-                <Text
-                  style={[
-                    styles.contextText,
-                    { color: colors.textSecondary },
-                    line.verse >= verse.verse && line.verse <= (verse.verseEnd || verse.verse)
-                      ? [styles.contextHighlight, { color: colors.text }]
-                      : null,
-                  ]}
-                >
-                  {line.text}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-
-        {related.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Related verses</Text>
-            {related.map((item) => (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: true,
+        })}
+      >
+        <Animated.View style={{ transform: [{ scale: heroScale }] }}>
+          <LinearGradient
+            colors={colors.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.hero, heroShadow(isDark), { paddingTop: insets.top + spacing.md }]}
+          >
+            <View style={styles.heroGlow} />
+            <View style={styles.heroActions}>
               <TouchableOpacity
-                key={item.id}
-                style={[styles.relatedCard, { backgroundColor: colors.card }]}
-                onPress={() => navigation.push('VerseDetail', { verseId: item.id })}
+                style={styles.actionButton}
+                onPress={() => navigation.goBack()}
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
               >
-                <Text style={[styles.relatedReference, { color: colors.accent }]}>{item.reference}</Text>
-                <Text style={[styles.relatedText, { color: colors.textSecondary }]} numberOfLines={3}>
-                  {item.text}
-                </Text>
+                <Ionicons name="arrow-back" size={21} color="#FFFFFF" />
               </TouchableOpacity>
-            ))}
-          </View>
-        ) : null}
-      </View>
-    </ScrollView>
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.actionSpacing]}
+                  onPress={toggleFavorite}
+                  accessibilityRole="button"
+                  accessibilityLabel={isFavorite ? 'Remove bookmark' : 'Bookmark verse'}
+                >
+                  <PopOnChange active={isFavorite}>
+                    <Ionicons
+                      name={isFavorite ? 'bookmark' : 'bookmark-outline'}
+                      size={21}
+                      color="#FFFFFF"
+                    />
+                  </PopOnChange>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.actionSpacing]}
+                  onPress={shareVerse}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share verse"
+                >
+                  <Ionicons name="share-social-outline" size={21} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <ScaleIn delay={60}>
+              <Text style={styles.heroReference}>{verse.reference}</Text>
+              <View style={styles.heroMetaRow}>
+                <View style={styles.heroBadge}>
+                  <Text style={styles.heroBadgeText}>{verse.translation}</Text>
+                </View>
+                <View style={styles.heroBadge}>
+                  <Text style={styles.heroBadgeText}>{verse.testament} Testament</Text>
+                </View>
+              </View>
+            </ScaleIn>
+          </LinearGradient>
+        </Animated.View>
+
+        <View style={styles.content}>
+          <FadeIn delay={80} fromY={16}>
+            <View style={[styles.verseCard, { backgroundColor: colors.card }, cardShadow(isDark)]}>
+              <Text style={[styles.quoteGlyph, { color: colors.accentSoft }]}>“</Text>
+              <Text style={[styles.verseText, { color: colors.text }]}>{verse.text}</Text>
+            </View>
+
+            {verse.topics.length > 0 && (
+              <View style={styles.tagsContainer}>
+                {verse.topics.map((topic) => (
+                  <View
+                    key={topic}
+                    style={[styles.tag, { backgroundColor: colors.accentSoft }]}
+                  >
+                    <Ionicons name="pricetag" size={10} color={colors.accent} />
+                    <Text style={[styles.tagText, { color: colors.accent }]}>{topic}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <PressableScale
+              onPress={addToReadingList}
+              accessibilityRole="button"
+              accessibilityLabel={isPro ? 'Add to reading list' : 'Unlock reading list'}
+            >
+              <LinearGradient
+                colors={colors.gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.readingButton, heroShadow(isDark)]}
+              >
+                <Ionicons
+                  name={isPro ? (onList ? 'checkmark-circle' : 'add-circle-outline') : 'lock-open-outline'}
+                  size={19}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.readingButtonText}>
+                  {isPro ? (onList ? 'On your reading list' : 'Add to reading list') : 'Unlock reading list'}
+                </Text>
+              </LinearGradient>
+            </PressableScale>
+          </FadeIn>
+
+          {verse.context.length > 0 ? (
+            <FadeIn delay={150}>
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>In context</Text>
+                <View style={[styles.contextCard, { backgroundColor: colors.card }, cardShadow(isDark)]}>
+                  {verse.context.map((line) => {
+                    const highlighted =
+                      line.verse >= verse.verse && line.verse <= (verse.verseEnd || verse.verse);
+                    return (
+                      <View
+                        key={line.verse}
+                        style={[
+                          styles.contextRow,
+                          highlighted
+                            ? { backgroundColor: colors.accentSoft, borderRadius: radius.md, padding: spacing.md }
+                            : null,
+                        ]}
+                      >
+                        <Text style={[styles.contextNumber, { color: colors.accent }]}>{line.verse}</Text>
+                        <Text
+                          style={[
+                            styles.contextText,
+                            { color: highlighted ? colors.text : colors.textSecondary },
+                            highlighted ? styles.contextHighlight : null,
+                          ]}
+                        >
+                          {line.text}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            </FadeIn>
+          ) : null}
+
+          {related.length > 0 ? (
+            <FadeIn delay={210}>
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Related verses</Text>
+                {related.map((item, index) => (
+                  <FadeIn key={item.id} delay={staggerDelay(index, 40, 160)} fromY={8}>
+                    <PressableScale
+                      style={[styles.relatedCard, { backgroundColor: colors.card }, cardShadow(isDark)]}
+                      onPress={() => navigation.push('VerseDetail', { verseId: item.id })}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open ${item.reference}`}
+                    >
+                      <View style={styles.relatedHeader}>
+                        <Text style={[styles.relatedReference, { color: colors.accent }]}>
+                          {item.reference}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                      </View>
+                      <Text style={[styles.relatedText, { color: colors.textSecondary }]} numberOfLines={3}>
+                        {item.text}
+                      </Text>
+                    </PressableScale>
+                  </FadeIn>
+                ))}
+              </View>
+            </FadeIn>
+          ) : null}
+        </View>
+      </Animated.ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
-  loadingContainer: {
+  stateContainer: {
     flex: 1,
-    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  plainBack: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
-    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: 40,
-  },
-  errorText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  retryButton: {
-    backgroundColor: '#2F6F62',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    marginLeft: spacing.lg,
+    marginTop: spacing.md,
   },
   hero: {
-    paddingTop: 16,
-    paddingBottom: 28,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingBottom: spacing.xxl + spacing.sm,
+    paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
+  },
+  heroGlow: {
+    position: 'absolute',
+    bottom: -90,
+    left: -50,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   heroActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 24,
+    marginBottom: spacing.xxl,
   },
   actionButtons: {
     flexDirection: 'row',
   },
   actionButton: {
     backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 20,
+    borderRadius: radius.pill,
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 10,
+  },
+  actionSpacing: {
+    marginLeft: spacing.md,
   },
   heroReference: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 8,
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    color: '#FFFFFF',
+    marginBottom: spacing.md,
   },
-  heroTranslation: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
+  heroMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  heroBadge: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+  },
+  heroBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.95)',
   },
   content: {
-    padding: 20,
+    padding: spacing.xl,
+  },
+  verseCard: {
+    borderRadius: radius.xl,
+    padding: spacing.xl + 2,
+    marginTop: -spacing.xxl - spacing.sm,
+    marginBottom: spacing.lg,
+    overflow: 'hidden',
+  },
+  quoteGlyph: {
+    position: 'absolute',
+    top: -26,
+    right: spacing.lg,
+    fontSize: 120,
+    fontWeight: '800',
   },
   verseText: {
-    fontSize: 22,
-    lineHeight: 34,
+    fontSize: 21,
+    lineHeight: 33,
     fontWeight: '500',
-    marginBottom: 20,
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 20,
+    gap: spacing.sm,
+    marginBottom: spacing.xl,
   },
   tag: {
-    backgroundColor: '#2F6F62',
-    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: spacing.md,
     paddingVertical: 6,
-    borderRadius: 15,
-    marginRight: 8,
-    marginBottom: 8,
+    borderRadius: radius.pill,
   },
   tagText: {
-    color: 'white',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   readingButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2F6F62',
-    borderRadius: 22,
-    paddingVertical: 12,
-    marginBottom: 24,
+    gap: spacing.sm,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.lg,
+    marginBottom: spacing.xxl,
   },
   readingButtonText: {
-    color: 'white',
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 8,
+    color: '#FFFFFF',
+    fontSize: 15.5,
+    fontWeight: '700',
   },
   section: {
-    marginBottom: 25,
+    marginBottom: spacing.xxl,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 15,
+    ...typography.section,
+    marginBottom: spacing.md,
+  },
+  contextCard: {
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.sm,
   },
   contextRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 10,
   },
   contextNumber: {
-    width: 28,
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 2,
+    width: 26,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 3,
   },
   contextText: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15.5,
     lineHeight: 24,
   },
   contextHighlight: {
     fontWeight: '600',
   },
   relatedCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  relatedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
   relatedReference: {
     fontSize: 15,
     fontWeight: '700',
-    marginBottom: 6,
   },
   relatedText: {
-    fontSize: 15,
-    lineHeight: 22,
+    ...typography.body,
   },
 });

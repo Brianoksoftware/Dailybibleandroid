@@ -1,16 +1,13 @@
 import React, { useLayoutEffect, useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { VerseSearchResult } from '../types/Verse';
 import { getFavorites, removeFavorite, setFavorites } from '../storage/favorites';
+import EmptyState from '../components/EmptyState';
+import VerseCard from '../components/VerseCard';
+import VerseSkeleton from '../components/VerseSkeleton';
+import { FadeIn } from '../theme/motion';
 import { useTheme } from '../theme/ThemeContext';
+import { spacing, typography } from '../theme/tokens';
 
 interface FavoritesScreenProps {
   navigation: any;
@@ -69,52 +66,31 @@ export default function FavoritesScreen({ navigation }: FavoritesScreenProps) {
     navigation.setOptions({
       headerRight: () =>
         favorites.length > 0 ? (
-          <TouchableOpacity onPress={clearAllFavorites} style={{ paddingHorizontal: 12 }}>
-            <Text style={{ color: colors.accent, fontWeight: '600' }}>Clear</Text>
+          <TouchableOpacity onPress={clearAllFavorites} style={styles.headerButton}>
+            <Text style={[styles.headerButtonText, { color: colors.accent }]}>Clear</Text>
           </TouchableOpacity>
         ) : null,
     });
   }, [navigation, favorites.length, colors.accent]);
 
-  const renderFavoriteCard = ({ item }: { item: VerseSearchResult }) => (
-    <TouchableOpacity
-      style={[styles.verseCard, { backgroundColor: colors.card }]}
-      onPress={() => navigation.navigate('VerseDetail', { verseId: item.id })}
-    >
-      <View style={styles.verseInfo}>
-        <Text style={[styles.verseReference, { color: colors.accent }]}>{item.reference}</Text>
-        <Text style={[styles.verseText, { color: colors.text }]} numberOfLines={3}>
-          {item.text}
-        </Text>
-      </View>
-      <TouchableOpacity style={styles.removeButton} onPress={() => onRemove(item.id)}>
-        <Ionicons name="bookmark" size={20} color={colors.accent} />
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading saved verses...</Text>
+      <View style={[styles.container, styles.padded, { backgroundColor: colors.background }]}>
+        <VerseSkeleton count={4} />
       </View>
     );
   }
 
   if (favorites.length === 0) {
     return (
-      <View style={[styles.emptyState, { backgroundColor: colors.background }]}>
-        <Ionicons name="bookmark-outline" size={80} color={colors.textMuted} />
-        <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No bookmarks yet</Text>
-        <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-          Save verses with the bookmark icon, then they will appear here.
-        </Text>
-        <TouchableOpacity
-          style={[styles.exploreButton, { backgroundColor: colors.accent }]}
-          onPress={() => navigation.navigate('Home')}
-        >
-          <Text style={styles.exploreButtonText}>Explore verses</Text>
-        </TouchableOpacity>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <EmptyState
+          icon="bookmark-outline"
+          title="No bookmarks yet"
+          message="Tap the bookmark icon on any verse and it will show up here, ready to read offline."
+          actionLabel="Explore verses"
+          onAction={() => navigation.navigate('Home')}
+        />
       </View>
     );
   }
@@ -122,11 +98,27 @@ export default function FavoritesScreen({ navigation }: FavoritesScreenProps) {
   return (
     <FlatList
       data={favorites}
-      renderItem={renderFavoriteCard}
+      renderItem={({ item, index }) => (
+        <VerseCard
+          verse={item}
+          index={index}
+          bookmarked
+          showTopics={false}
+          onPress={() => navigation.navigate('VerseDetail', { verseId: item.id })}
+          onToggleBookmark={() => onRemove(item.id)}
+        />
+      )}
       keyExtractor={(item) => item.id.toString()}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.listContainer}
       style={[styles.container, { backgroundColor: colors.background }]}
+      ListHeaderComponent={
+        <FadeIn>
+          <Text style={[styles.count, { color: colors.textMuted }]}>
+            {favorites.length} saved verse{favorites.length === 1 ? '' : 's'}
+          </Text>
+        </FadeIn>
+      }
     />
   );
 }
@@ -134,77 +126,24 @@ export default function FavoritesScreen({ navigation }: FavoritesScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#666',
+  padded: {
+    paddingHorizontal: spacing.lg + 2,
+    paddingTop: spacing.lg,
   },
   listContainer: {
-    padding: 20,
+    paddingHorizontal: spacing.lg + 2,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
-  verseCard: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    marginBottom: 15,
-    overflow: 'hidden',
-    flexDirection: 'row',
+  count: {
+    ...typography.eyebrow,
+    marginBottom: spacing.md,
   },
-  verseInfo: {
-    flex: 1,
-    padding: 15,
-    justifyContent: 'center',
+  headerButton: {
+    paddingHorizontal: spacing.md,
   },
-  verseReference: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  verseText: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  removeButton: {
-    padding: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    backgroundColor: '#F8F9FA',
-  },
-  emptyStateTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 30,
-  },
-  exploreButton: {
-    backgroundColor: '#2F6F62',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
-  },
-  exploreButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+  headerButtonText: {
+    ...typography.label,
   },
 });

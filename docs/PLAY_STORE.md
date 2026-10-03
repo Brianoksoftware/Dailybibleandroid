@@ -1,4 +1,4 @@
-# Play Store search optimization — Daily Bible
+# Play Store search optimization — Daily Bible Friend Offline
 
 Listing copy lives in `store.config.js`. Paste it into Play Console after you create the app and upload an AAB.
 
@@ -14,7 +14,7 @@ Listing copy lives in `store.config.js`. Paste it into Play Console after you cr
 
 | Field | Value | Notes |
 | --- | --- | --- |
-| App name / title | Daily Bible | ≤30 chars; matches launcher name |
+| App name / title | Daily Bible Friend Offline | ≤30 chars; matches launcher name |
 | Short description | Verse of the day… | ≤80; heavily indexed for Play search |
 | Full description | Conversion-focused | Features, free vs Pro, KJV note + keyword phrases |
 | Category | Books & Reference | Set in Play Console |
@@ -25,13 +25,13 @@ Listing copy lives in `store.config.js`. Paste it into Play Console after you cr
 Short description (for manual paste):
 
 ```text
-Verse of the day, Scripture search & bookmarks. Free to start; Pro unlocks more.
+Offline daily verse, KJV search & bookmarks. Free; Pro unlocks unlimited search.
 ```
 
 Search phrases woven into the full description (Play indexes description text, not a separate keyword field):
 
 ```text
-verse, scripture, kjv, devotional, faith, gospel, christian, prayer, inspire, psalm, jesus, god, worship, hope, bible, daily bible, verse of the day
+offline bible, bible friend, daily bible, verse of the day, offline scripture, kjv, devotional, christian, faith, gospel, prayer, psalm, jesus, worship, hope, bible, scripture, verse
 ```
 
 ## What only you can do (Play Console / marketing)
@@ -61,13 +61,15 @@ Tips: large readable verse text, little UI chrome in the first frame, no competi
 
 ### 4. In-app product listing copy
 In Play Console → Monetize → In-app products → `dailybible_pro` (managed product / one-time):
-- **Name**: `Daily Bible Pro`
+- **Name**: `Bible Friend Pro`
 - **Description**: `Unlimited search & reading list`
 - Price ≈ $3.99 (or local equivalents)
 - Activate the product before release
 
-### 5. Data safety
-Answer Data safety to match the policy: **no data collected by the developer** (no account, no analytics; Google Play Billing handles payments). Declare that the app does not collect personal data for analytics or advertising.
+### 5. Ads + Data safety
+- App content → **Contains ads: Yes**
+- Data safety: declare AdMob-related data (device IDs / advertising ID, approximate location as applicable) shared with Google for advertising; Play Billing for purchases
+- Host an updated privacy policy that mentions AdMob banners and that Pro removes ads
 
 ### 6. Availability and pricing
 - Countries/regions  

@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
   Alert,
   ScrollView,
 } from 'react-native';
@@ -17,17 +16,27 @@ import { VerseService } from '../services/verseService';
 import { SearchParams, Testament, VerseSearchResult } from '../types/Verse';
 import { usePro } from '../pro/ProContext';
 import { openPaywall } from '../navigation/openPaywall';
+import BannerAdSlot from '../ads/BannerAdSlot';
+import Chip from '../components/Chip';
+import EmptyState from '../components/EmptyState';
+import VerseCard from '../components/VerseCard';
+import VerseSkeleton from '../components/VerseSkeleton';
 import { consumeSearch, getSearchQuota, SearchQuota } from '../storage/searchQuota';
+import { FadeIn, PressableScale, ProgressBar } from '../theme/motion';
 import { useTheme } from '../theme/ThemeContext';
+import { radius, spacing, typography } from '../theme/tokens';
+import { cardShadow } from '../theme/ui';
+import { confirmOfflineLimited, isOnline } from '../utils/network';
 
 interface SearchScreenProps {
   navigation: any;
 }
 
 const TESTAMENTS: Testament[] = ['Old', 'New'];
+const FREE_SEARCHES_PER_DAY = 3;
 
 export default function SearchScreen({ navigation }: SearchScreenProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { isPro } = usePro();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBook, setSelectedBook] = useState('');
@@ -37,6 +46,9 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [quota, setQuota] = useState<SearchQuota | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const activeFilters = [selectedTopic, selectedBook, selectedTestament].filter(Boolean).length;
 
   useFocusEffect(
     useCallback(() => {
@@ -70,6 +82,12 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
       }
     }
 
+    const online = await isOnline();
+    if (!online) {
+      const continueOffline = await confirmOfflineLimited('Search');
+      if (!continueOffline) return;
+    }
+
     setLoading(true);
     setHasSearched(true);
 
@@ -79,13 +97,26 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
       if (selectedBook) searchParams.book = selectedBook;
       if (selectedTopic) searchParams.topic = selectedTopic;
       if (selectedTestament) searchParams.testament = selectedTestament;
-      setSearchResults(await VerseService.searchVerses(searchParams));
+      const results = await VerseService.searchVerses(searchParams);
+      setSearchResults(results);
       if (!isPro) {
         setQuota(await consumeSearch());
       }
+      if (results.length === 0 && !online) {
+        Alert.alert(
+          'No offline matches',
+          'No matching verses were found in the app’s saved catalog. Connect to the internet for full Scripture search.'
+        );
+      }
     } catch (error) {
       console.error('Search failed:', error);
-      Alert.alert('Search error', 'Could not search verses. Please try again.');
+      const stillOnline = await isOnline();
+      Alert.alert(
+        stillOnline ? 'Search error' : 'No internet connection',
+        stillOnline
+          ? 'Could not search verses. Please try again.'
+          : 'Search needs an internet connection for live results. Check your network and try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -100,143 +131,195 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
     setHasSearched(false);
   };
 
-  const renderFilterChip = (label: string, isSelected: boolean, onPress: () => void) => (
-    <TouchableOpacity
-      style={[
-        styles.filterChip,
-        {
-          backgroundColor: isSelected ? colors.accent : colors.chip,
-          borderColor: isSelected ? colors.accent : colors.border,
-        },
-      ]}
-      onPress={onPress}
-    >
-      <Text style={[styles.filterChipText, { color: isSelected ? '#FFFFFF' : colors.textSecondary }]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
+  const filterRow = (
+    label: string,
+    options: readonly string[],
+    isSelected: (option: string) => boolean,
+    onToggle: (option: string) => void,
+    formatLabel?: (option: string) => string
+  ) => (
+    <View style={styles.filterGroup}>
+      <Text style={[styles.filterLabel, { color: colors.textMuted }]}>{label}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.filterChips}>
+          {options.map((option) => (
+            <Chip
+              key={option}
+              label={formatLabel ? formatLabel(option) : option}
+              selected={isSelected(option)}
+              onPress={() => onToggle(option)}
+            />
+          ))}
+        </View>
+      </ScrollView>
+    </View>
   );
 
-  const renderVerseCard = ({ item }: { item: VerseSearchResult }) => (
-    <TouchableOpacity
-      style={[styles.verseCard, { backgroundColor: colors.card }]}
-      onPress={() => navigation.navigate('VerseDetail', { verseId: item.id })}
-    >
-      <View style={styles.verseInfo}>
-        <Text style={[styles.verseReference, { color: colors.accent }]}>{item.reference}</Text>
-        <Text style={[styles.verseText, { color: colors.text }]} numberOfLines={3}>
-          {item.text}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const used = quota ? Math.max(0, FREE_SEARCHES_PER_DAY - quota.remaining) : 0;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.searchSection, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <View style={[styles.searchBar, { backgroundColor: colors.input }]}>
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search a word or John 3:16"
-            placeholderTextColor={colors.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={performSearch}
-            returnKeyType="search"
-          />
-          <TouchableOpacity onPress={performSearch} style={[styles.searchButton, { backgroundColor: colors.accent }]}>
-            <Ionicons name="arrow-forward" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
-
-        {!isPro && quota ? (
-          <TouchableOpacity
-            style={styles.quotaRow}
-            onPress={quota.remaining <= 0 ? showLimitReached : undefined}
-          >
-            <Text style={[styles.quotaText, { color: quota.remaining <= 0 ? colors.accent : colors.textSecondary }]}>
-              {quota.remaining <= 0
-                ? 'No free searches left today · Unlock Pro'
-                : `${quota.remaining} free search${quota.remaining === 1 ? '' : 'es'} left today`}
-            </Text>
-          </TouchableOpacity>
-        ) : null}
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersContainer}>
-          <View style={styles.filtersRow}>
-            <Text style={[styles.filterLabel, { color: colors.text }]}>Topic</Text>
-            {TOPICS.map((topic) => (
-              <View key={topic}>
-                {renderFilterChip(topic, selectedTopic === topic, () =>
-                  setSelectedTopic(selectedTopic === topic ? '' : topic)
-                )}
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersContainer}>
-          <View style={styles.filtersRow}>
-            <Text style={[styles.filterLabel, { color: colors.text }]}>Book</Text>
-            {POPULAR_BOOKS.map((book) => (
-              <View key={book}>
-                {renderFilterChip(book, selectedBook === book, () =>
-                  setSelectedBook(selectedBook === book ? '' : book)
-                )}
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersContainer}>
-          <View style={styles.filtersRow}>
-            <Text style={[styles.filterLabel, { color: colors.text }]}>Testament</Text>
-            {TESTAMENTS.map((testament) => (
-              <View key={testament}>
-                {renderFilterChip(
-                  `${testament} Testament`,
-                  selectedTestament === testament,
-                  () => setSelectedTestament(selectedTestament === testament ? '' : testament)
-                )}
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-
-        <TouchableOpacity
-          style={[styles.clearButton, { backgroundColor: colors.chip, borderColor: colors.border }]}
-          onPress={clearFilters}
+      <FadeIn fromY={6}>
+        <View
+          style={[
+            styles.searchSection,
+            { backgroundColor: colors.card, borderBottomColor: colors.border },
+            cardShadow(isDark),
+          ]}
         >
-          <Text style={[styles.clearButtonText, { color: colors.textSecondary }]}>Clear filters</Text>
-        </TouchableOpacity>
-      </View>
+          <View style={[styles.searchBar, { backgroundColor: colors.input, borderColor: colors.border }]}>
+            <Ionicons name="search" size={18} color={colors.textMuted} style={styles.searchIcon} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Search a word or verse"
+              placeholderTextColor={colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={performSearch}
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 ? (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search text"
+              >
+                <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            ) : null}
+            <PressableScale
+              onPress={performSearch}
+              scaleTo={0.9}
+              accessibilityRole="button"
+              accessibilityLabel="Search"
+              style={[styles.searchButton, { backgroundColor: colors.accent }]}
+            >
+              <Ionicons name="arrow-forward" size={18} color={colors.accentOn} />
+            </PressableScale>
+          </View>
+
+          <View style={styles.controlRow}>
+            <PressableScale
+              onPress={() => setFiltersOpen((open) => !open)}
+              scaleTo={0.95}
+              accessibilityRole="button"
+              accessibilityLabel={filtersOpen ? 'Hide filters' : 'Show filters'}
+              style={[styles.controlButton, { backgroundColor: colors.chip, borderColor: colors.border }]}
+            >
+              <Ionicons name="options-outline" size={16} color={colors.textSecondary} />
+              <Text style={[styles.controlText, { color: colors.textSecondary }]}>Filters</Text>
+              {activeFilters > 0 ? (
+                <View style={[styles.countBadge, { backgroundColor: colors.accent }]}>
+                  <Text style={[styles.countBadgeText, { color: colors.accentOn }]}>{activeFilters}</Text>
+                </View>
+              ) : (
+                <Ionicons
+                  name={filtersOpen ? 'chevron-up' : 'chevron-down'}
+                  size={14}
+                  color={colors.textMuted}
+                />
+              )}
+            </PressableScale>
+
+            {activeFilters > 0 || searchQuery.length > 0 || hasSearched ? (
+              <TouchableOpacity onPress={clearFilters} accessibilityRole="button">
+                <Text style={[styles.clearText, { color: colors.accent }]}>Clear all</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {filtersOpen ? (
+            <FadeIn fromY={6} duration={220} style={styles.filtersPanel}>
+              {filterRow(
+                'Topic',
+                TOPICS,
+                (topic) => selectedTopic === topic,
+                (topic) => setSelectedTopic(selectedTopic === topic ? '' : topic)
+              )}
+              {filterRow(
+                'Book',
+                POPULAR_BOOKS,
+                (book) => selectedBook === book,
+                (book) => setSelectedBook(selectedBook === book ? '' : book)
+              )}
+              {filterRow(
+                'Testament',
+                TESTAMENTS,
+                (testament) => selectedTestament === testament,
+                (testament) =>
+                  setSelectedTestament(
+                    selectedTestament === testament ? '' : (testament as Testament)
+                  ),
+                (testament) => `${testament} Testament`
+              )}
+            </FadeIn>
+          ) : null}
+
+          {!isPro && quota ? (
+            <TouchableOpacity
+              style={styles.quotaBlock}
+              onPress={quota.remaining <= 0 ? showLimitReached : () => openPaywall(navigation)}
+              accessibilityRole="button"
+              accessibilityLabel="Free search allowance"
+            >
+              <View style={styles.quotaHeader}>
+                <Text
+                  style={[
+                    styles.quotaText,
+                    { color: quota.remaining <= 0 ? colors.accent : colors.textSecondary },
+                  ]}
+                >
+                  {quota.remaining <= 0
+                    ? 'No free searches left today'
+                    : `${quota.remaining} of ${FREE_SEARCHES_PER_DAY} free searches left`}
+                </Text>
+                <Text style={[styles.quotaCta, { color: colors.accent }]}>Go unlimited</Text>
+              </View>
+              <ProgressBar
+                value={used / FREE_SEARCHES_PER_DAY}
+                trackColor={colors.input}
+                fillColor={quota.remaining <= 0 ? colors.accent : colors.accentAlt}
+                height={5}
+              />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </FadeIn>
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Searching verses...</Text>
+        <View style={styles.skeletonWrap}>
+          <VerseSkeleton count={5} />
         </View>
       ) : (
         <FlatList
           data={hasSearched ? searchResults : []}
-          renderItem={renderVerseCard}
+          renderItem={({ item, index }) => (
+            <VerseCard
+              verse={item}
+              index={index}
+              showTopics={false}
+              onPress={() => navigation.navigate('VerseDetail', { verseId: item.id })}
+            />
+          )}
           keyExtractor={(item) => item.id.toString()}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Text style={[styles.emptyStateText, { color: colors.text }]}>
-                {hasSearched ? 'No verses found' : 'Search the Scriptures'}
-              </Text>
-              <Text style={[styles.emptyStateSubtext, { color: colors.textSecondary }]}>
-                {hasSearched
+            <EmptyState
+              icon={hasSearched ? 'search-outline' : 'sparkles-outline'}
+              title={hasSearched ? 'No verses found' : 'Search the Scriptures'}
+              message={
+                hasSearched
                   ? 'Try a different word, reference, or filter.'
-                  : 'Use the search bar or filters above.'}
-              </Text>
-            </View>
+                  : 'Type a word or a reference like John 3:16, or open filters to browse by topic.'
+              }
+            />
           }
         />
       )}
+      <BannerAdSlot />
     </View>
   );
 }
@@ -244,134 +327,112 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   searchSection: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E9ECEF',
+    paddingHorizontal: spacing.lg + 2,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomLeftRadius: radius.lg,
+    borderBottomRightRadius: radius.lg,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    borderRadius: 25,
-    paddingHorizontal: 15,
-    marginBottom: 15,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+    borderWidth: 1,
+    gap: spacing.sm,
+  },
+  searchIcon: {
+    marginRight: 0,
   },
   searchInput: {
     flex: 1,
-    height: 50,
-    fontSize: 16,
+    height: 44,
+    fontSize: 15.5,
   },
   searchButton: {
-    backgroundColor: '#2F6F62',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
+    borderRadius: radius.pill,
+    width: 38,
+    height: 38,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  quotaRow: {
-    marginBottom: 12,
-  },
-  quotaText: {
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  filtersContainer: {
-    marginBottom: 10,
-  },
-  filtersRow: {
+  controlRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: 20,
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+  },
+  controlButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  controlText: {
+    ...typography.label,
+  },
+  countBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  countBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  clearText: {
+    ...typography.label,
+  },
+  filtersPanel: {
+    marginTop: spacing.md,
+  },
+  filterGroup: {
+    marginBottom: spacing.md,
   },
   filterLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginRight: 10,
-    minWidth: 72,
+    ...typography.eyebrow,
+    marginBottom: spacing.sm,
   },
-  filterChip: {
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-  },
-  filterChipText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  clearButton: {
-    alignSelf: 'center',
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-    marginTop: 4,
-  },
-  clearButtonText: {
-    color: '#666',
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  filterChips: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingRight: spacing.lg,
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
+  quotaBlock: {
+    marginTop: spacing.md,
+  },
+  quotaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  quotaText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+  },
+  quotaCta: {
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  skeletonWrap: {
+    paddingHorizontal: spacing.lg + 2,
+    paddingTop: spacing.lg,
   },
   listContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: spacing.lg + 2,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
     flexGrow: 1,
-  },
-  verseCard: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    marginTop: 15,
-    overflow: 'hidden',
-  },
-  verseInfo: {
-    padding: 15,
-  },
-  verseReference: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  verseText: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  emptyState: {
-    paddingTop: 48,
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  emptyStateText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
-  },
-  emptyStateSubtext: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 10,
-    textAlign: 'center',
-    lineHeight: 24,
   },
 });

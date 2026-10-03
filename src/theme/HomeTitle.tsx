@@ -1,28 +1,19 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { openRootScreen } from '../navigation/openRootScreen';
+import { APP_SHORT_NAME } from '../branding';
 import { useTheme } from './ThemeContext';
-import ThemeToggle from './ThemeToggle';
+import { radius, spacing } from './tokens';
 
 export default function HomeTitle() {
   const { colors } = useTheme();
-  const navigation = useNavigation();
 
   return (
     <View style={styles.row}>
-      <Text style={[styles.title, { color: colors.text }]}>Daily Bible</Text>
-      <ThemeToggle />
-      <TouchableOpacity
-        onPress={() => openRootScreen(navigation, 'About')}
-        style={[styles.info, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityRole="button"
-        accessibilityLabel="About, privacy, and terms"
-      >
-        <Ionicons name="information-circle-outline" size={18} color={colors.accent} />
-      </TouchableOpacity>
+      <View style={[styles.mark, { backgroundColor: colors.accentSoft }]}>
+        <Ionicons name="book" size={14} color={colors.accent} />
+      </View>
+      <Text style={[styles.title, { color: colors.text }]}>{APP_SHORT_NAME}</Text>
     </View>
   );
 }
@@ -32,17 +23,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  title: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  info: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  mark: {
+    width: 26,
+    height: 26,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
-    borderWidth: 1,
+    marginRight: spacing.sm,
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '700',
   },
 });

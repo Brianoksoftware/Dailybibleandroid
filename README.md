@@ -1,4 +1,4 @@
-# Daily Bible
+# Daily Bible Friend Offline
 
 A daily Bible verse app built with React Native and Expo for Android (Expo Go). It keeps the same structure as the previous recipe app: home, search, saved bookmarks, a Pro reading list, sharing, and light/dark theme.
 
